@@ -8,18 +8,27 @@ type Config struct {
 }
 
 const (
-	salesforceSection = "salesforce"
-	userKey           = "user"
-	passwordKey       = "password"
+	salesforceSection     = "salesforce"
+	salesforceUserKey     = "user"
+	salesforcePasswordKey = "password"
+	chronusSection        = "chronus"
+	chronusUserKey        = "user"
+	chronusPasswordKey    = "password"
 )
 
-func NewConfig(configPath string) (*Config, error) {
+func ParseCredentials(c *ini.File, section string, userKey string, passwordKey string) *Config {
+	return &Config{
+		User:     c.Section(section).Key(userKey).String(),
+		Password: c.Section(section).Key(passwordKey).String(),
+	}
+}
+
+func NewConfig(configPath string) (*Config, *Config, error) {
 	c, err := ini.Load(configPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &Config{
-		User:     c.Section(salesforceSection).Key(userKey).String(),
-		Password: c.Section(salesforceSection).Key(passwordKey).String(),
-	}, nil
+	salesforceCredentials := ParseCredentials(c, salesforceSection, salesforceUserKey, salesforcePasswordKey)
+	chronusCredentials := ParseCredentials(c, chronusSection, chronusUserKey, chronusPasswordKey)
+	return salesforceCredentials, chronusCredentials, nil
 }

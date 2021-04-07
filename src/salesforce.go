@@ -6,14 +6,14 @@ import (
 )
 
 const (
-	SleepTime = 3 * time.Second
+	SalesforceSleepTime = 3 * time.Second
 
 	SalesforceLoginUrl = `https://login.salesforce.com/`
 
 	// Html Attribute Name In Login Menu
-	UserNameID = "username"
-	PasswordID = "password"
-	LoginID    = "Login"
+	SalesforceUserNameID = "username"
+	SalesforcePasswordID = "password"
+	SalesforceLoginID    = "Login"
 
 	// Html Attribute Name In Main Menu
 	WorkTabID   = "01r7F0000017C6B_Tab"
@@ -62,20 +62,20 @@ func (d *Driver) NewSalesForce(username, password string) (*salesforce, error) {
 
 func (sf *salesforce) Login() error {
 	// ID, Passの要素を取得し、値を設定
-	_ = sf.Page.FindByID(UserNameID).Fill(sf.Account.UserName)
-	_ = sf.Page.FindByID(PasswordID).Fill(sf.Account.Password)
+	_ = sf.Page.FindByID(SalesforceUserNameID).Fill(sf.Account.UserName)
+	_ = sf.Page.FindByID(SalesforcePasswordID).Fill(sf.Account.Password)
 
 	// formをサブミット
-	if err := sf.Page.FindByID(LoginID).Submit(); err != nil {
+	if err := sf.Page.FindByID(SalesforceLoginID).Submit(); err != nil {
 		return err
 	}
 
-	time.Sleep(SleepTime)
+	time.Sleep(SalesforceSleepTime)
 	return nil
 
 }
 
-func (sf *salesforce) RegisterWork() error {
+func (sf *salesforce) ParseWork() error {
 
 	today := time.Now()
 
@@ -85,7 +85,7 @@ func (sf *salesforce) RegisterWork() error {
 	}
 
 	// ちょっと待つ
-	time.Sleep(SleepTime)
+	time.Sleep(SalesforceSleepTime)
 
 	// 月を選択
 	err := sf.Page.FindByID(MonthListID).Select(today.Format(MonthListTextFormat))
@@ -94,7 +94,7 @@ func (sf *salesforce) RegisterWork() error {
 	}
 
 	// ちょっと待つ
-	time.Sleep(SleepTime)
+	time.Sleep(SalesforceSleepTime)
 
 	// 勤務表の行情報イテレーション
 	startDate := time.Date(today.Year(), today.Month()-1, 1, 0, 0, 0, 0, time.UTC)
