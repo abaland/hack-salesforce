@@ -14,12 +14,13 @@ const (
 	ChronusUserNameSelector    = `document.FORM_COMMON.PersonCode.value`
 	ChronusPasswordSelector    = `document.FORM_COMMON.Password.value`
 	ChronusLoginSubmitSelector = `a`
+
+	ChronusTimeFormat = "1504" // min:sec
 )
 
 type chronus struct {
-	Account   account
-	Page      *agouti.Page
-	WorkMonth []workday
+	Account account
+	Page    *agouti.Page
 }
 
 func (d *Driver) NewChronus(username, password string) (*chronus, error) {
@@ -54,8 +55,23 @@ func (ch *chronus) Login() error {
 
 }
 
-func (ch *chronus) RegisterWork() error {
-	time.Sleep(60 * time.Second)
+func (ds *DaySchedule) ToChronus() DayScheduleStr {
+	return DayScheduleStr{
+		ds.WorkStart.Format(ChronusTimeFormat),
+		ds.WorkEnd.Format(ChronusTimeFormat),
+		ds.Break1Start.Format(ChronusTimeFormat),
+		ds.Break1End.Format(ChronusTimeFormat),
+		ds.Break2Start.Format(ChronusTimeFormat),
+		ds.Break2End.Format(ChronusTimeFormat),
+	}
+}
+
+func (ch *chronus) RegisterWork(workMonth []workday) error {
+	time.Sleep(5 * time.Second)
+
+	for _, workDay := range workMonth {
+		print(workDay.Day)
+	}
 
 	return nil
 }

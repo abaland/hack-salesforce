@@ -52,14 +52,14 @@ func main() {
 	}
 
 	// Setting Daily Works
-	if err := sf.ParseWork(); err != nil {
+	workmonth, err := sf.ParseWork()
+	if err != nil {
 		logger.Errorf("Failed to RegisterWork:%v", err)
 		return
 	}
 	logger.Infof("finish to parse work.")
 
-	// Write file to json TODO Add Chronus registration
-	file, _ := json.MarshalIndent(sf.WorkMonth, "", " ")
+	file, _ := json.MarshalIndent(workmonth, "", " ")
 	_ = ioutil.WriteFile("test.json", file, 0644)
 
 	ch, err := driver.NewChronus(chronusConfig.User, chronusConfig.Password)
@@ -74,7 +74,7 @@ func main() {
 	}
 
 	//
-	if err := ch.RegisterWork(); err != nil {
+	if err := ch.RegisterWork(workmonth); err != nil {
 		logger.Errorf("Failed to RegisterWork:%v", err)
 		return
 	}

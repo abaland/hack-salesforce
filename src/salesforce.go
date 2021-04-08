@@ -1,28 +1,43 @@
 package main
 
 import (
+	"fmt"
 	"github.com/sclevine/agouti"
 	"time"
 )
 
 const (
-	SalesforceSleepTime = 3 * time.Second
+	SalesforceSleepTime      = 3 * time.Second
+	SalesforceShortSleepTime = 500
 
 	SalesforceLoginUrl = `https://login.salesforce.com/`
 
-	// Html Attribute Name In Login Menu
+	// Login menu info
 	SalesforceUserNameID = "username"
 	SalesforcePasswordID = "password"
 	SalesforceLoginID    = "Login"
 
-	// Html Attribute Name In Main Menu
-	WorkTabID   = "01r7F0000017C6B_Tab"
-	MonthListID = "yearMonthList"
-	WorkRowId   = "dateRow"
-	DayOffValue = "年次有給休暇"
+	// Main Menu Info
+	WorkTabID = "01r7F0000017C6B_Tab"
+
+	// Schedule Menu info
+	MonthListID               = "yearMonthList"
+	workStatusSelectorPattern = "tr#dateRow%s td.vstatus"
+	DayOffValue               = "年次有給休暇"
+
+	workModalButtonSelectPattern = "tr#dateRow%s td.vst"
+	workStartTimeScript          = "return document.getElementById('startTime').value"
+	workEndTimeScript            = "return document.getElementById('endTime').value"
+	break1StartTimeScript        = "return document.getElementById('startRest1').value"
+	break1EndTimeScript          = "return document.getElementById('endRest1').value"
+	break2StartTimeScript        = "return document.getElementById('startRest2').value"
+	break2EndTimeScript          = "return document.getElementById('endRest2').value"
+	cancelButtonID               = "dlgInpTimeCancel" // This month
+	closeButtonID                = "dlgInpTimeClose"  // Last month
 
 	MonthListTextFormat = "2006年01月"
-	InputTimeFormat     = "15:04"
+
+	SalesforceTimeFormat = "15:04" // min:sec
 )
 
 type account struct {
@@ -31,16 +46,15 @@ type account struct {
 }
 
 type workday struct {
-	Day       string
-	DayOff    bool
-	StartTime string
-	EndTime   string
+	Day          string
+	DayOff       bool
+	RegularBreak bool
+	WorkSchedule DaySchedule
 }
 
 type salesforce struct {
-	Account   account
-	Page      *agouti.Page
-	WorkMonth []workday
+	Account account
+	Page    *agouti.Page
 }
 
 func (d *Driver) NewSalesForce(username, password string) (*salesforce, error) {
@@ -75,50 +89,104 @@ func (sf *salesforce) Login() error {
 
 }
 
-func (sf *salesforce) ParseWork() error {
+func (ds *DaySchedule) FromSalesforce(dss DayScheduleStr) {
+
+	workStart, _ := time.Parse(SalesforceTimeFormat, dss.WorkStart)
+	workEnd, _ := time.Parse(SalesforceTimeFormat, dss.WorkEnd)
+	ds.WorkStart = workStart
+	ds.WorkEnd = workEnd
+
+	break1Start, _ := time.Parse(SalesforceTimeFormat, dss.Break1Start)
+	break1End, _ := time.Parse(SalesforceTimeFormat, dss.Break1End)
+	ds.Break1Start = break1Start
+	ds.Break1End = break1End
+
+	break2Start, _ := time.Parse(SalesforceTimeFormat, dss.Break2Start)
+	break2End, _ := time.Parse(SalesforceTimeFormat, dss.Break2End)
+	ds.Break2Start = break2Start
+	ds.Break2End = break2End
+
+	return
+}
+
+func (sf *salesforce) ParseWork() ([]workday, error) {
+
+	// ID, Passの要素を取得し、値を設定
 
 	today := time.Now()
 
+	// month to process
+	processDate := today
+
+	var workMonth []workday
+
 	// 勤務表タブをクリック
 	if err := sf.Page.FindByID(WorkTabID).Click(); err != nil {
-		return err
+		return workMonth, err
 	}
 
 	// ちょっと待つ
 	time.Sleep(SalesforceSleepTime)
 
 	// 月を選択
-	err := sf.Page.FindByID(MonthListID).Select(today.Format(MonthListTextFormat))
+	err := sf.Page.FindByID(MonthListID).Select(processDate.Format(MonthListTextFormat))
 	if err != nil {
-		return err
+		return workMonth, err
 	}
 
 	// ちょっと待つ
 	time.Sleep(SalesforceSleepTime)
 
 	// 勤務表の行情報イテレーション
-	startDate := time.Date(today.Year(), today.Month()-1, 1, 0, 0, 0, 0, time.UTC)
-	for d := startDate; d.Month() == startDate.Month(); d = d.AddDate(0, 0, 1) {
+	startDate := time.Date(processDate.Year(), processDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+	for d := startDate; d.Month() == processDate.Month(); d = d.AddDate(0, 0, 1) {
 
+		// Open day modal
 		day := d.Format("2006-01-02")
-		workStatusSelector := "tr #" + WorkRowId + day + " td.vstatus"
-		workStartSelector := "tr #" + WorkRowId + day + " td.vst"
-		workEndSelector := "tr #" + WorkRowId + day + " td.vet"
 
+		workStatusSelector := fmt.Sprintf(workStatusSelectorPattern, day)
 		workStatusText, _ := sf.Page.Find(workStatusSelector).Attribute("title")
 		dayOffBool := workStatusText == DayOffValue
-		startText, _ := sf.Page.Find(workStartSelector).Text()
-		endText, _ := sf.Page.Find(workEndSelector).Text()
 
-		workdayDetails := workday{
-			Day:       day,
-			DayOff:    dayOffBool,
-			StartTime: startText,
-			EndTime:   endText,
+		workdayDetails := workday{Day: day, DayOff: dayOffBool}
+		if !dayOffBool {
+			workModalButtonSelect := fmt.Sprintf(workModalButtonSelectPattern, day)
+			_ = sf.Page.Find(workModalButtonSelect).Click()
+			time.Sleep(SalesforceShortSleepTime)
+
+			// The following values are in input.value, not in an attribute, so we need JS to get them
+			var startText, endText string
+			_ = sf.Page.RunScript(workStartTimeScript, nil, &startText)
+			_ = sf.Page.RunScript(workEndTimeScript, nil, &endText)
+
+			var break1StartText, break1EndText string
+			_ = sf.Page.RunScript(break1StartTimeScript, nil, &break1StartText)
+			_ = sf.Page.RunScript(break1EndTimeScript, nil, &break1EndText)
+
+			var break2StartText, break2EndText string
+			_ = sf.Page.RunScript(break2StartTimeScript, nil, &break2StartText)
+			_ = sf.Page.RunScript(break2EndTimeScript, nil, &break2EndText)
+
+			workSchedule := DaySchedule{}
+			workSchedule.FromSalesforce(DayScheduleStr{
+				WorkStart:   startText,
+				WorkEnd:     endText,
+				Break1Start: break1StartText,
+				Break1End:   break1EndText,
+				Break2Start: break2StartText,
+				Break2End:   break2EndText,
+			})
+			workdayDetails.WorkSchedule = workSchedule
+			workdayDetails.RegularBreak = workSchedule.IsRegularBreak()
+
+			// Button changes if past month data is displayed => try both cases
+			_ = sf.Page.FindByID(cancelButtonID).Click()
+			_ = sf.Page.FindByID(closeButtonID).Click()
+			time.Sleep(SalesforceShortSleepTime)
 		}
 
-		sf.WorkMonth = append(sf.WorkMonth, workdayDetails)
+		workMonth = append(workMonth, workdayDetails)
 	}
 
-	return nil
+	return workMonth, nil
 }
