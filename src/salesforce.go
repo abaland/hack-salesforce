@@ -8,7 +8,7 @@ import (
 
 const (
 	SalesforceSleepTime      = 3 * time.Second
-	SalesforceShortSleepTime = 500
+	SalesforceShortSleepTime = 500 * time.Nanosecond
 
 	SalesforceLoginUrl = `https://login.salesforce.com/`
 
@@ -32,8 +32,10 @@ const (
 	break1EndTimeScript          = "return document.getElementById('endRest1').value"
 	break2StartTimeScript        = "return document.getElementById('startRest2').value"
 	break2EndTimeScript          = "return document.getElementById('endRest2').value"
-	cancelButtonID               = "dlgInpTimeCancel" // This month
-	closeButtonID                = "dlgInpTimeClose"  // Last month
+	commentIDPattern             = "tr#dateRow%s td.vnote"
+
+	cancelButtonID = "dlgInpTimeCancel" // This month
+	closeButtonID  = "dlgInpTimeClose"  // Last month
 
 	MonthListTextFormat = "2006年01月"
 
@@ -46,9 +48,12 @@ type account struct {
 }
 
 type workday struct {
-	Day          string
+	Day string
+
 	DayOff       bool
 	RegularBreak bool
+
+	WorkComment  string
 	WorkSchedule DaySchedule
 }
 
@@ -111,12 +116,8 @@ func (ds *DaySchedule) FromSalesforce(dss DayScheduleStr) {
 
 func (sf *salesforce) ParseWork() ([]workday, error) {
 
-	// ID, Passの要素を取得し、値を設定
-
-	today := time.Now()
-
 	// month to process
-	processDate := today
+	processDate := time.Now()
 
 	var workMonth []workday
 
@@ -148,7 +149,10 @@ func (sf *salesforce) ParseWork() ([]workday, error) {
 		workStatusText, _ := sf.Page.Find(workStatusSelector).Attribute("title")
 		dayOffBool := workStatusText == DayOffValue
 
-		workdayDetails := workday{Day: day, DayOff: dayOffBool}
+		commentID := fmt.Sprintf(commentIDPattern, day)
+		workComment, _ := sf.Page.Find(commentID).Attribute("title")
+
+		workdayDetails := workday{Day: day, DayOff: dayOffBool, WorkComment: workComment}
 		if !dayOffBool {
 			workModalButtonSelect := fmt.Sprintf(workModalButtonSelectPattern, day)
 			_ = sf.Page.Find(workModalButtonSelect).Click()
