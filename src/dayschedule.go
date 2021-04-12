@@ -30,3 +30,13 @@ func (ds *DaySchedule) IsRegularBreak() bool {
 	break2Time := ds.Break2End.Sub(ds.Break2Start).Minutes()
 	return break1Time+break2Time == 60
 }
+
+func (ds *DaySchedule) GetTotWorkTime() time.Duration {
+
+	workTime := ds.WorkEnd.Sub(ds.WorkStart)
+	break1Time := ds.Break1End.Sub(ds.Break1Start)
+	break2Time := ds.Break2End.Sub(ds.Break2Start)
+	workTime = workTime - break1Time - break2Time
+
+	return workTime
+}
