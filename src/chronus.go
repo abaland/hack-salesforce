@@ -2,11 +2,13 @@ package main
 
 import (
 	"github.com/sclevine/agouti"
+	"strconv"
 	"time"
 )
 
 const (
-	ChronusSleepTime = 3 * time.Second
+	ChronusSleepTime      = 2 * time.Second
+	ChronusShortSleepTime = 1 * time.Millisecond
 
 	ChronusLoginUrl = `https://chronus-ext.tis.co.jp/Lysithea/Logon`
 
@@ -15,7 +17,14 @@ const (
 	ChronusPasswordSelector    = `document.FORM_COMMON.Password.value`
 	ChronusLoginSubmitSelector = `a`
 
-	ChronusTimeFormat = "1504" // min:sec
+	ChronusCalendarFrameName    = "MENU"
+	ChronusDayScheduleFrameName = "OPERATION"
+	ChronusClickableDays        = `td.calCellNotRegistration a.calLinkWeekDay`
+	ChronusMaxDays              = 31 // After removing weekend, 22 is max?
+
+	ChronusWorkStartTimeSelector = `input[type="text"][name="StartTime"]`
+	ChronusWorkEndTimeSelector   = `input[type="text"][name="EndTime"]`
+	ChronusTimeFormat            = "1504" // min:sec
 )
 
 type chronus struct {
@@ -67,10 +76,39 @@ func (ds *DaySchedule) ToChronus() DayScheduleStr {
 }
 
 func (ch *chronus) RegisterWork(workMonth []workday) error {
-	time.Sleep(5 * time.Second)
 
-	for _, workDay := range workMonth {
-		print(workDay.Day)
+	_ = ch.Page.ConfirmPopup()
+	time.Sleep(ChronusShortSleepTime)
+
+	// First switch frame to focus on the calendar one (without that, we cannot select the items inside)
+	calendarFrame := ch.Page.FindByName(ChronusCalendarFrameName)
+	dayFrame := ch.Page.FindByName(ChronusDayScheduleFrameName)
+	_ = calendarFrame.SwitchToFrame()
+	editableDays := ch.Page.All(ChronusClickableDays)
+
+	for i := 0; i < ChronusMaxDays; i++ {
+		dayAsText, _ := editableDays.At(i).Text()
+		dayAsInt, _ := strconv.Atoi(dayAsText)
+
+		for _, workDay := range workMonth {
+			if workDay.DayIdx == dayAsInt {
+
+				chronusSchedule := workDay.WorkSchedule.ToChronus()
+
+				print(workDay.Day)
+				_ = editableDays.At(i).Click()
+
+				_ = ch.Page.SwitchToRootFrame()
+				_ = dayFrame.SwitchToFrame()
+
+				_ = ch.Page.Find(ChronusWorkStartTimeSelector).Fill(chronusSchedule.WorkStart)
+				_ = ch.Page.Find(ChronusWorkEndTimeSelector).Fill(chronusSchedule.WorkEnd)
+
+				_ = ch.Page.SwitchToRootFrame()
+				_ = calendarFrame.SwitchToFrame()
+
+			}
+		}
 	}
 
 	return nil
