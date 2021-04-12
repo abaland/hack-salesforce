@@ -48,7 +48,8 @@ type account struct {
 }
 
 type workday struct {
-	Day string
+	DayIdx int
+	Day    string
 
 	DayOff       bool
 	RegularBreak bool
@@ -152,7 +153,12 @@ func (sf *salesforce) ParseWork() ([]workday, error) {
 		commentID := fmt.Sprintf(commentIDPattern, day)
 		workComment, _ := sf.Page.Find(commentID).Attribute("title")
 
-		workdayDetails := workday{Day: day, DayOff: dayOffBool, WorkComment: workComment}
+		workdayDetails := workday{
+			DayIdx:      d.Day(),
+			Day:         day,
+			DayOff:      dayOffBool,
+			WorkComment: workComment,
+		}
 		if !dayOffBool {
 			workModalButtonSelect := fmt.Sprintf(workModalButtonSelectPattern, day)
 			_ = sf.Page.Find(workModalButtonSelect).Click()
@@ -192,5 +198,6 @@ func (sf *salesforce) ParseWork() ([]workday, error) {
 		workMonth = append(workMonth, workdayDetails)
 	}
 
+	_ = sf.Page.CloseWindow()
 	return workMonth, nil
 }
