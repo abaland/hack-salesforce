@@ -39,6 +39,9 @@ const (
 	ChronusWorkTypeCompanyName = `出社`
 	ChronusWorkTypeRemoteName  = `フルテレワーク`
 
+	ChronusRegisterButtonSelector  = `img[src="../gif/toroku.jpg"]`
+	ChronusCalendarRefreshSelector = `img[src="../gif/saihyoji.gif"]`
+
 	ChronusTimeFormat = "1504" // min:sec
 )
 
@@ -200,6 +203,7 @@ func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
 	print(err)
 
 	// Submit
+	err = ch.Page.Find(ChronusRegisterButtonSelector).Click()
 
 	return nil
 }
@@ -227,17 +231,20 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 				_ = ch.Page.SwitchToRootFrame()
 				_ = dayFrame.SwitchToFrame()
 
-				_ = ch.RegisterWorkOneDay(workDay)
+				if workDay.WorkSchedule.WorkStart.Hour() != 0 {
+					_ = ch.RegisterWorkOneDay(workDay)
+				}
 
 				_ = ch.Page.SwitchToRootFrame()
 				_ = calendarFrame.SwitchToFrame()
-
 				break
 			}
 		}
 
 		time.Sleep(5 * time.Second)
 	}
+
+	_ = ch.Page.Find(ChronusCalendarRefreshSelector).Click()
 
 	return nil
 }
