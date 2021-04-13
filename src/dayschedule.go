@@ -11,6 +11,9 @@ type DayScheduleStr struct {
 
 	Break2Start string
 	Break2End   string
+
+	Break3Start string
+	Break3End   string
 }
 
 type DaySchedule struct {
@@ -22,21 +25,23 @@ type DaySchedule struct {
 
 	Break2Start time.Time
 	Break2End   time.Time
+
+	Break3Start time.Time
+	Break3End   time.Time
 }
 
 func (ds *DaySchedule) IsRegularBreak() bool {
-
-	break1Time := ds.Break1End.Sub(ds.Break1Start).Minutes()
-	break2Time := ds.Break2End.Sub(ds.Break2Start).Minutes()
-	return break1Time+break2Time == 60
+	return ds.GetTotBreakTime().Minutes() == 60
 }
 
 func (ds *DaySchedule) GetTotWorkTime() time.Duration {
+	return ds.WorkEnd.Sub(ds.WorkStart) - ds.GetTotBreakTime()
+}
 
-	workTime := ds.WorkEnd.Sub(ds.WorkStart)
+func (ds *DaySchedule) GetTotBreakTime() time.Duration {
+
 	break1Time := ds.Break1End.Sub(ds.Break1Start)
 	break2Time := ds.Break2End.Sub(ds.Break2Start)
-	workTime = workTime - break1Time - break2Time
 
-	return workTime
+	return break1Time + break2Time
 }

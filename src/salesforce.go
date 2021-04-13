@@ -28,11 +28,15 @@ const (
 	workModalButtonSelectPattern = "tr#dateRow%s td.vst"
 	workStartTimeScript          = "return document.getElementById('startTime').value"
 	workEndTimeScript            = "return document.getElementById('endTime').value"
-	break1StartTimeScript        = "return document.getElementById('startRest1').value"
-	break1EndTimeScript          = "return document.getElementById('endRest1').value"
-	break2StartTimeScript        = "return document.getElementById('startRest2').value"
-	break2EndTimeScript          = "return document.getElementById('endRest2').value"
-	commentIDPattern             = "tr#dateRow%s td.vnote"
+
+	break1StartTimeScript = "return document.getElementById('startRest1').value"
+	break1EndTimeScript   = "return document.getElementById('endRest1').value"
+	break2StartTimeScript = "return document.getElementById('startRest2').value"
+	break2EndTimeScript   = "return document.getElementById('endRest2').value"
+	break3StartTimeScript = "return document.getElementById('startRest3').value"
+	break3EndTimeScript   = "return document.getElementById('endRest3').value"
+
+	commentIDPattern = "tr#dateRow%s td.vnote"
 
 	cancelButtonID = "dlgInpTimeCancel" // This month
 	closeButtonID  = "dlgInpTimeClose"  // Last month
@@ -112,6 +116,11 @@ func (ds *DaySchedule) FromSalesforce(dss DayScheduleStr) {
 	ds.Break2Start = break2Start
 	ds.Break2End = break2End
 
+	break3Start, _ := time.Parse(SalesforceTimeFormat, dss.Break3Start)
+	break3End, _ := time.Parse(SalesforceTimeFormat, dss.Break3End)
+	ds.Break3Start = break3Start
+	ds.Break3End = break3End
+
 	return
 }
 
@@ -177,6 +186,10 @@ func (sf *salesforce) ParseWork() ([]workday, error) {
 			_ = sf.Page.RunScript(break2StartTimeScript, nil, &break2StartText)
 			_ = sf.Page.RunScript(break2EndTimeScript, nil, &break2EndText)
 
+			var break3StartText, break3EndText string
+			_ = sf.Page.RunScript(break3StartTimeScript, nil, &break3StartText)
+			_ = sf.Page.RunScript(break3EndTimeScript, nil, &break3EndText)
+
 			workSchedule := DaySchedule{}
 			workSchedule.FromSalesforce(DayScheduleStr{
 				WorkStart:   startText,
@@ -185,6 +198,8 @@ func (sf *salesforce) ParseWork() ([]workday, error) {
 				Break1End:   break1EndText,
 				Break2Start: break2StartText,
 				Break2End:   break2EndText,
+				Break3Start: break3StartText,
+				Break3End:   break3EndText,
 			})
 			workdayDetails.WorkSchedule = workSchedule
 			workdayDetails.RegularBreak = workSchedule.IsRegularBreak()

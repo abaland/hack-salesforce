@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/sclevine/agouti"
+	"math"
 	"strconv"
 	"time"
 )
@@ -24,7 +26,23 @@ const (
 
 	ChronusWorkStartTimeSelector = `input[type="text"][name="StartTime"]`
 	ChronusWorkEndTimeSelector   = `input[type="text"][name="EndTime"]`
-	ChronusTimeFormat            = "1504" // min:sec
+
+	// All 3 breaks have the same selector!
+	ChronusWorkBreakStartSelector = `td input.InputTxtR[name="PrivateStart"]`
+	ChronusWorkBreakEndSelector   = `td input.InputTxtR[name="PrivateEnd"]`
+
+	ChronusCommentSelector = `input[type="text"][name="Comment"]`
+
+	ChronusShukouCode            = "00003L3:他社出向業務"
+	ChronusProjectSelectSelector = `select[name="CostNoItem"]`
+	ChronusProjectHourSelector   = `input[type="text"][name="CostQuantity"]`
+
+	ChronusScanStartSelector   = `input[type="text"][name="StartTimeStamp"]`
+	ChronusWorkTypeSelector    = `select[name="AllowanceItem"]`
+	ChronusWorkTypeCompanyName = `出社`
+	ChronusWorkTypeRemoteName  = `フルテレワーク`
+
+	ChronusTimeFormat = "1504" // min:sec
 )
 
 type chronus struct {
@@ -72,7 +90,116 @@ func (ds *DaySchedule) ToChronus() DayScheduleStr {
 		ds.Break1End.Format(ChronusTimeFormat),
 		ds.Break2Start.Format(ChronusTimeFormat),
 		ds.Break2End.Format(ChronusTimeFormat),
+		ds.Break3Start.Format(ChronusTimeFormat),
+		ds.Break3End.Format(ChronusTimeFormat),
 	}
+}
+
+func fmtDuration(d time.Duration) string {
+	d = d.Round(time.Minute)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	return fmt.Sprintf("%02d%02d", h, m)
+}
+
+func (ws *DaySchedule) GetChronusBreaks() ([][]time.Time, error) {
+
+	var err error
+
+	lunchTime, _ := time.Parse("1504", "1230")
+	chronusBreaks := [][]time.Time{
+		{ws.Break1Start, ws.Break1End},
+		{ws.Break2Start, ws.Break2End},
+		{ws.Break3Start, ws.Break3End},
+	}
+
+	// Remove all empty breaks
+	firstEmptyIdx := len(chronusBreaks)
+	for i := 0; i < len(chronusBreaks); i++ {
+		if chronusBreaks[i][0].Hour() == 0 {
+			firstEmptyIdx = i
+			break
+		}
+	}
+	chronusBreaks = chronusBreaks[:firstEmptyIdx]
+
+	// Move break closest to lunch and set it to lunch time
+	lunchClosestIdx := 0
+	lunchDistance := 24 * 60.
+	for i := 0; i < len(chronusBreaks); i++ {
+		lunchTimeDistance1 := math.Abs(lunchTime.Sub(chronusBreaks[i][0]).Minutes())
+		lunchTimeDistance2 := math.Abs(lunchTime.Sub(chronusBreaks[i][1]).Minutes())
+		if math.Min(lunchTimeDistance1, lunchTimeDistance2) < lunchDistance {
+			lunchClosestIdx = i
+			lunchDistance = math.Min(lunchTimeDistance1, lunchTimeDistance2)
+		}
+	}
+
+	closestBreakDuration := chronusBreaks[lunchClosestIdx][1].Sub(chronusBreaks[lunchClosestIdx][0])
+	if closestBreakDuration.Minutes() == 60 {
+		chronusBreaks = append(chronusBreaks[:lunchClosestIdx], chronusBreaks[lunchClosestIdx+1:]...)
+	} else if closestBreakDuration.Minutes() < 60 {
+		err = fmt.Errorf("lunch break less than 60min. Giving up")
+	} else {
+		chronusBreaks[lunchClosestIdx][0], _ = time.Parse("1504", "1200")
+		chronusBreaks[lunchClosestIdx][1] = chronusBreaks[lunchClosestIdx][0].Add(closestBreakDuration)
+	}
+
+	return chronusBreaks, err
+}
+
+func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
+
+	ws := workDay.WorkSchedule
+	chronusSchedule := ws.ToChronus()
+
+	// Fill-in top of the page
+	err := ch.Page.Find(ChronusWorkStartTimeSelector).Fill(chronusSchedule.WorkStart)
+	print(err)
+	err = ch.Page.Find(ChronusWorkEndTimeSelector).Fill(chronusSchedule.WorkEnd)
+	print(err)
+
+	// Fill-in リモート・出社
+	scanStart, err := ch.Page.Find(ChronusScanStartSelector).Attribute("value")
+	if scanStart == "" {
+		err = ch.Page.Find(ChronusWorkTypeSelector).Select(ChronusWorkTypeRemoteName)
+	} else {
+		err = ch.Page.Find(ChronusWorkTypeSelector).Select(ChronusWorkTypeCompanyName)
+	}
+
+	// Fill in 中断 section
+	totBreakTime := ws.GetTotBreakTime()
+	if totBreakTime.Minutes() != 60 {
+
+		breakStartInputs := ch.Page.All(ChronusWorkBreakStartSelector)
+		breakEndInputs := ch.Page.All(ChronusWorkBreakEndSelector)
+		breaksInfo, err := ws.GetChronusBreaks()
+		for breakIdx, breakInfo := range breaksInfo {
+
+			breakStartTimeStr := breakInfo[0].Format("1504")
+			breakEndTimeStr := breakInfo[1].Format("1504")
+
+			err = breakStartInputs.At(breakIdx).Fill(breakStartTimeStr)
+			print(err)
+			err = breakEndInputs.At(breakIdx).Fill(breakEndTimeStr)
+			print(err)
+		}
+	}
+
+	// Fill in 備考 section
+	err = ch.Page.Find(ChronusCommentSelector).Fill(workDay.WorkComment)
+	print(err)
+
+	// Fill in bottom section
+	err = ch.Page.All(ChronusProjectSelectSelector).At(0).Select(ChronusShukouCode)
+	print(err)
+	err = ch.Page.All(ChronusProjectHourSelector).At(0).Fill(fmtDuration(ws.GetTotWorkTime()))
+	print(err)
+
+	// Submit
+
+	return nil
 }
 
 func (ch *chronus) RegisterWork(workMonth []workday) error {
@@ -91,9 +218,7 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 		dayAsInt, _ := strconv.Atoi(dayAsText)
 
 		for _, workDay := range workMonth {
-			if workDay.DayIdx == dayAsInt {
-
-				chronusSchedule := workDay.WorkSchedule.ToChronus()
+			if workDay.DayIdx == dayAsInt && workDay.WorkSchedule.WorkEnd.Hour() > 0 {
 
 				print(workDay.Day)
 				_ = editableDays.At(i).Click()
@@ -101,14 +226,16 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 				_ = ch.Page.SwitchToRootFrame()
 				_ = dayFrame.SwitchToFrame()
 
-				_ = ch.Page.Find(ChronusWorkStartTimeSelector).Fill(chronusSchedule.WorkStart)
-				_ = ch.Page.Find(ChronusWorkEndTimeSelector).Fill(chronusSchedule.WorkEnd)
+				_ = ch.RegisterWorkOneDay(workDay)
 
 				_ = ch.Page.SwitchToRootFrame()
 				_ = calendarFrame.SwitchToFrame()
 
+				break
 			}
 		}
+
+		time.Sleep(5 * time.Second)
 	}
 
 	return nil
