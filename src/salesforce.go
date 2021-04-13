@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	SalesforceSleepTime      = 3 * time.Second
-	SalesforceShortSleepTime = 500 * time.Nanosecond
+	SalesforceMaxSleepTime   = 10 * time.Second
+	SalesforceShortSleepTime = 100 * time.Nanosecond
 
 	SalesforceLoginUrl = `https://login.salesforce.com/`
 
@@ -20,8 +20,12 @@ const (
 	// Main Menu Info
 	WorkTabID = "01r7F0000017C6B_Tab"
 
+	// Sleep queries
+	MonthLoaded = "shim"
+
 	// Schedule Menu info
 	MonthListID               = "yearMonthList"
+	MonthListOptions          = "#yearMonthList option"
 	workStatusSelectorPattern = "tr#dateRow%s td.vstatus"
 	DayOffValue               = "年次有給休暇"
 
@@ -94,7 +98,6 @@ func (sf *salesforce) Login() error {
 		return err
 	}
 
-	time.Sleep(SalesforceSleepTime)
 	return nil
 
 }
@@ -124,6 +127,22 @@ func (ds *DaySchedule) FromSalesforce(dss DayScheduleStr) {
 	return
 }
 
+func isSalesforceLoginFinished(Page *agouti.Page) bool {
+	count, _ := Page.FindByID(WorkTabID).Count()
+	return count > 0
+}
+
+func isScheduleLoaded(Page *agouti.Page) bool {
+	count, _ := Page.All(MonthListOptions).Count()
+	return count > 2
+}
+
+func isMonthLoaded(Page *agouti.Page) bool {
+	displayValue, err := Page.FindByID(MonthLoaded).CSS("display")
+	print(err)
+	return displayValue == "none"
+}
+
 func (sf *salesforce) ParseWork() ([]workday, error) {
 
 	// month to process
@@ -131,13 +150,15 @@ func (sf *salesforce) ParseWork() ([]workday, error) {
 
 	var workMonth []workday
 
+	_ = sleepUntil(isSalesforceLoginFinished, sf.Page, SalesforceMaxSleepTime)
+
 	// 勤務表タブをクリック
 	if err := sf.Page.FindByID(WorkTabID).Click(); err != nil {
 		return workMonth, err
 	}
 
 	// ちょっと待つ
-	time.Sleep(SalesforceSleepTime)
+	_ = sleepUntil(isScheduleLoaded, sf.Page, SalesforceMaxSleepTime)
 
 	// 月を選択
 	err := sf.Page.FindByID(MonthListID).Select(processDate.Format(MonthListTextFormat))
@@ -146,7 +167,7 @@ func (sf *salesforce) ParseWork() ([]workday, error) {
 	}
 
 	// ちょっと待つ
-	time.Sleep(SalesforceSleepTime)
+	_ = sleepUntil(isMonthLoaded, sf.Page, SalesforceMaxSleepTime)
 
 	// 勤務表の行情報イテレーション
 	startDate := time.Date(processDate.Year(), processDate.Month(), 1, 0, 0, 0, 0, time.UTC)

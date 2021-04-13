@@ -9,9 +9,6 @@ import (
 )
 
 const (
-	ChronusSleepTime      = 2 * time.Second
-	ChronusShortSleepTime = 1 * time.Millisecond
-
 	ChronusLoginUrl = `https://chronus-ext.tis.co.jp/Lysithea/Logon`
 
 	// Html Attribute Name In Login Menu
@@ -77,9 +74,14 @@ func (ch *chronus) Login() error {
 		return err
 	}
 
-	time.Sleep(ChronusSleepTime)
 	return nil
 
+}
+
+func isChronusLoginFinished(Page *agouti.Page) bool {
+	_ = Page.ConfirmPopup()
+	count, _ := Page.FindByName(ChronusCalendarFrameName).Count()
+	return count > 0
 }
 
 func (ds *DaySchedule) ToChronus() DayScheduleStr {
@@ -204,8 +206,7 @@ func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
 
 func (ch *chronus) RegisterWork(workMonth []workday) error {
 
-	_ = ch.Page.ConfirmPopup()
-	time.Sleep(ChronusShortSleepTime)
+	_ = sleepUntil(isChronusLoginFinished, ch.Page, SalesforceMaxSleepTime)
 
 	// First switch frame to focus on the calendar one (without that, we cannot select the items inside)
 	calendarFrame := ch.Page.FindByName(ChronusCalendarFrameName)
