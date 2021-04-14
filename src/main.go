@@ -12,7 +12,7 @@ var (
 )
 
 func main() {
-	flag.StringVar(&configPath, "config_path", "", "ini config path")
+	flag.StringVar(&configPath, "config_path", "./config.ini", "ini config path")
 	flag.Parse()
 
 	logger := NewLogger()
