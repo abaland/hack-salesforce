@@ -5,6 +5,7 @@ import (
 	"github.com/sclevine/agouti"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -39,8 +40,12 @@ const (
 	ChronusWorkTypeCompanyName = `出社`
 	ChronusWorkTypeRemoteName  = `フルテレワーク`
 
-	ChronusRegisterButtonSelector  = `img[src="../gif/toroku.jpg"]`
+	ChronusRegisterScript          = `top.dosubmitRegister()`
 	ChronusCalendarRefreshSelector = `img[src="../gif/saihyoji.gif"]`
+
+	// ChronusRegisteredTopBarScript using the .Text() property did not get the text correctly, so run JS to do it
+	ChronusRegisteredTopBarScript  = "return document.querySelector(`td[align=\"CENTER\"]`).innerText"
+	ChronusRegisteredErrorSelector = `font[color="red"]`
 
 	ChronusTimeFormat = "1504" // min:sec
 )
@@ -161,16 +166,26 @@ func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
 
 	// Fill-in top of the page
 	err := ch.Page.Find(ChronusWorkStartTimeSelector).Fill(chronusSchedule.WorkStart)
-	print(err)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 	err = ch.Page.Find(ChronusWorkEndTimeSelector).Fill(chronusSchedule.WorkEnd)
-	print(err)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
 	// Fill-in リモート・出社
 	scanStart, err := ch.Page.Find(ChronusScanStartSelector).Attribute("value")
 	if scanStart == "" {
 		err = ch.Page.Find(ChronusWorkTypeSelector).Select(ChronusWorkTypeRemoteName)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 	} else {
 		err = ch.Page.Find(ChronusWorkTypeSelector).Select(ChronusWorkTypeCompanyName)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
 	}
 
 	// Fill in 中断 section
@@ -186,65 +201,117 @@ func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
 			breakEndTimeStr := breakInfo[1].Format("1504")
 
 			err = breakStartInputs.At(breakIdx).Fill(breakStartTimeStr)
-			print(err)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 			err = breakEndInputs.At(breakIdx).Fill(breakEndTimeStr)
-			print(err)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 		}
+	}
+
+	// Fill in bottom section
+	err = ch.Page.All(ChronusProjectSelectSelector).At(0).Select(ChronusShukouCode)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = ch.Page.All(ChronusProjectHourSelector).At(0).Fill(fmtDuration(ws.GetTotWorkTime()))
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 
 	// Fill in 備考 section
 	err = ch.Page.Find(ChronusCommentSelector).Fill(workDay.WorkComment)
-	print(err)
-
-	// Fill in bottom section
-	err = ch.Page.All(ChronusProjectSelectSelector).At(0).Select(ChronusShukouCode)
-	print(err)
-	err = ch.Page.All(ChronusProjectHourSelector).At(0).Fill(fmtDuration(ws.GetTotWorkTime()))
-	print(err)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
 	// Submit
-	err = ch.Page.Find(ChronusRegisterButtonSelector).Click()
+	err = ch.Page.RunScript(ChronusRegisterScript, nil, nil)
 
 	return nil
+}
+
+func isDayRegistered(Page *agouti.Page) bool {
+	var topBarText string
+	_ = Page.RunScript(ChronusRegisteredTopBarScript, nil, &topBarText)
+	hasSuccess := strings.Contains(topBarText, "△")
+
+	hasErrorCount, _ := Page.FindByID(ChronusRegisteredErrorSelector).Count()
+	return hasErrorCount > 0 || hasSuccess
 }
 
 func (ch *chronus) RegisterWork(workMonth []workday) error {
 
 	_ = sleepUntil(isChronusLoginFinished, ch.Page, SalesforceMaxSleepTime)
+	time.Sleep(100 * time.Millisecond)
+	fmt.Println("Login finished")
 
 	// First switch frame to focus on the calendar one (without that, we cannot select the items inside)
 	calendarFrame := ch.Page.FindByName(ChronusCalendarFrameName)
 	dayFrame := ch.Page.FindByName(ChronusDayScheduleFrameName)
-	_ = calendarFrame.SwitchToFrame()
+	err := calendarFrame.SwitchToFrame()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 	editableDays := ch.Page.All(ChronusClickableDays)
 
-	for i := 0; i < ChronusMaxDays; i++ {
-		dayAsText, _ := editableDays.At(i).Text()
-		dayAsInt, _ := strconv.Atoi(dayAsText)
+	// We fill chronus backwards due to At() refreshing everytime the selection, thus skipping every other item
+	for i := ChronusMaxDays; i >= 0; i-- {
+		dayAsText, err := editableDays.At(i).Text()
+		if err != nil {
+			// Error here are due to out-of-range days (just skip those)
+			continue
+		}
+		dayAsInt, err := strconv.Atoi(dayAsText)
 
 		for _, workDay := range workMonth {
 			if workDay.DayIdx == dayAsInt && workDay.WorkSchedule.WorkEnd.Hour() > 0 {
 
-				print(workDay.Day)
-				_ = editableDays.At(i).Click()
-
-				_ = ch.Page.SwitchToRootFrame()
-				_ = dayFrame.SwitchToFrame()
-
-				if workDay.WorkSchedule.WorkStart.Hour() != 0 {
-					_ = ch.RegisterWorkOneDay(workDay)
+				fmt.Println(workDay.Day)
+				err = editableDays.At(i).Click()
+				if err != nil {
+					fmt.Println(err.Error())
 				}
 
-				_ = ch.Page.SwitchToRootFrame()
-				_ = calendarFrame.SwitchToFrame()
+				err = ch.Page.SwitchToRootFrame()
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+				err = dayFrame.SwitchToFrame()
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+
+				if workDay.WorkSchedule.WorkStart.Hour() != 0 {
+					err = ch.RegisterWorkOneDay(workDay)
+					if err != nil {
+						fmt.Println(err.Error())
+					}
+				}
+
+				_ = sleepUntil(isDayRegistered, ch.Page, SalesforceMaxSleepTime)
+
+				err = ch.Page.SwitchToRootFrame()
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+				err = calendarFrame.SwitchToFrame()
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+
+				err = ch.Page.Find(ChronusCalendarRefreshSelector).Click()
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+
 				break
 			}
 		}
 
-		time.Sleep(5 * time.Second)
 	}
-
-	_ = ch.Page.Find(ChronusCalendarRefreshSelector).Click()
 
 	return nil
 }

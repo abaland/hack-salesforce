@@ -39,7 +39,7 @@ func main() {
 		logger.Errorf("Failed to start:%v", err)
 		return
 	}
-	defer driver.Stop()
+	//defer driver.Stop()
 	sf, err := driver.NewSalesForce(salesforceConfig.User, salesforceConfig.Password)
 	if err != nil {
 		logger.Errorf("Failed to create instance:%v", err)
