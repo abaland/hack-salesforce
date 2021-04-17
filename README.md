@@ -29,14 +29,18 @@ http://golang.jp/install
 ### Install ChromeDriver
 Install [ChromeDriver](https://sites.google.com/a/chromium.org/chromedriver/downloads) and set Path.
 
-### Make build
+### Build
 ```bash
-$ make build
+git clone https://github.com/abaland/hack-salesforce 
+cd hack-salesforce
+go get -t ./src
+go build -o chronus_sync.exe -v ./src
+******edit config_file******
 ```
 
 ## How to use
 ```bash
-$ hack-salesforce --config_path {config_path} --jsonfile {jsonfile}
+./chronus_sync.exe --config_path {config_path} 
 ```
 
 ## Notes/Missing features
