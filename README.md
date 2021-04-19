@@ -40,8 +40,15 @@ go build -o chronus_sync.exe -v ./src
 
 ## How to use
 ```bash
+./chronus_sync.exe
+```
+If config.ini is located in the same folder.
+
+```bash
 ./chronus_sync.exe --config_path {config_path} 
 ```
+otherwise.
+
 
 ## Notes/Missing features
 
