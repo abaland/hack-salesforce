@@ -157,7 +157,7 @@ func (sf *salesforce) ParseDailySchedule() DaySchedule {
 	return workSchedule
 }
 
-// isSalesforceLoginFinished checks browser page to see if the page following log-in is done being displayed
+// isSalesforceLoginFinished checks browser page to see if the page following log-in is done loading
 func isSalesforceLoginFinished(Page *agouti.Page) bool {
 	count, _ := Page.FindByID(WorkTabId).Count()
 	return count > 0

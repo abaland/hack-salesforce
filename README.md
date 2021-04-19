@@ -11,15 +11,15 @@ template rendering to show the data, the code uses ChromeDriver to log in as
 a human would do (but faster) into both website and parse/register the data 
 through a mix of HTML parsing and JS.
 
-SalesForceもChronusもREST APIとテンプレートレンダリング機能がついていないのでChromeDriver
-を使って人間のようにログインしてHTMLとJSを使って読み込み・書き込んでいます。
+SalesForceもChronusもREST APIとテンプレートレンダリング機能がついていないので、ChromeDriver
+を使って人間のようにログインしてHTMLとJSを使って読み込み・書き込みをします。
 
 ## How to use
 Once the tool is built, rename the template_config.ini file as config.ini, fill in
 your credentials and just run the code.
 
 プログラムをビルドしてからtemplate_config.iniをconfig.iniとしてリネームし、
-ファイルの中にある認証情報を入力し.exeファイルを実行。
+ファイルの中にある認証情報を入力し.exeファイルを実行します。
 
 ## Build
 
@@ -51,14 +51,15 @@ The following features are still missing:
 
 下記の機能はまだ含まれていない：
 * 午前休・午後休：あまり取らないのでどう登録されているかわからなくて開発できなかった。
-* 中断回数4回以上：Chronusでは中断回数は最大3回（昼間以外）なので対応していない
+* 休憩回数4回以上：Chronusでは休憩回数は最大3回（昼間以外）なので対応していない。
 
 Please note the following:
 * Break times too complicated might lead to bugs. Because Chronus has an invisible unchangeable break during 12:00-13:00, 
   i'm moving the salesforce lunch break to this interval, but there might be overlaps and so on.
   
 注意点：
-* 複雑すぎるな中断は不具合になるかもしれない。Chronusでは非表示で変更不可の12:00-13:00昼間があるのでSalesforce(デフォルト：13:00-14:00)の昼間の時間を移動していますがおバーラップがないか確認していません。
+* 複雑すぎる休憩はバグになるかもしれない。Chronusでは12:00-13:00の昼休憩（非表示で変更不可）があるので、Salesforce
+  の昼休憩の時間(デフォルト：13:00-14:00)を移動しているが、オーバーラップがないか確認していない。
 
 # Refs
 https://github.com/shotasym/hack-salesforce

@@ -12,10 +12,12 @@ import (
 const (
 	ChronusLoginUrl = `https://chronus-ext.tis.co.jp/Lysithea/Logon`
 
-	// Html Attribute Name In Login Menu
-	ChronusUserNameSelector    = `document.FORM_COMMON.PersonCode.value`
-	ChronusPasswordSelector    = `document.FORM_COMMON.Password.value`
-	ChronusLoginSubmitSelector = `a`
+	// ChronusUserNameScript defines script to run to update chronus username field
+	ChronusUserNameScript = `document.FORM_COMMON.PersonCode.value="%s"`
+	// ChronusPasswordScript defines script to run to update chronus password field
+	ChronusPasswordScript = `document.FORM_COMMON.Password.value="%s"`
+	// ChronusLoginSubmitQuery defines selector to get login button in login page
+	ChronusLoginSubmitQuery = `a`
 
 	ChronusCalendarFrameName    = "MENU"
 	ChronusDayScheduleFrameName = "OPERATION"
@@ -54,6 +56,8 @@ type chronus struct {
 	Page *agouti.Page
 }
 
+// NewChronus creates a new page from the browser driver and opens the Chronus webpage, returning it into a
+// chronus instance
 func (d *Driver) NewChronus() (*chronus, error) {
 	page, err := d.NewPage()
 	if err != nil {
@@ -67,13 +71,13 @@ func (d *Driver) NewChronus() (*chronus, error) {
 	}, nil
 }
 
+// Login uses credentials received to log into chronus
 func (ch *chronus) Login(credentials Credentials) error {
 	// ID, Passの要素を取得し、値を設定
-	noScriptArgs := map[string]interface{}{}
-	_ = ch.Page.RunScript(ChronusUserNameSelector+"= \""+credentials.User+"\"", noScriptArgs, nil)
-	_ = ch.Page.RunScript(ChronusPasswordSelector+"= \""+credentials.Password+"\"", noScriptArgs, nil)
+	_ = ch.Page.RunScript(fmt.Sprintf(ChronusUserNameScript, credentials.User), nil, nil)
+	_ = ch.Page.RunScript(fmt.Sprintf(ChronusPasswordScript, credentials.Password), nil, nil)
 	// formをサブミット
-	if err := ch.Page.Find(ChronusLoginSubmitSelector).Click(); err != nil {
+	if err := ch.Page.Find(ChronusLoginSubmitQuery).Click(); err != nil {
 		return err
 	}
 
@@ -81,25 +85,7 @@ func (ch *chronus) Login(credentials Credentials) error {
 
 }
 
-func isChronusLoginFinished(Page *agouti.Page) bool {
-	_ = Page.ConfirmPopup()
-	count, _ := Page.FindByName(ChronusCalendarFrameName).Count()
-	return count > 0
-}
-
-func (ds *DaySchedule) ToChronus() DayScheduleStr {
-	return DayScheduleStr{
-		ds.WorkStart.Format(ChronusTimeFormat),
-		ds.WorkEnd.Format(ChronusTimeFormat),
-		ds.Break1Start.Format(ChronusTimeFormat),
-		ds.Break1End.Format(ChronusTimeFormat),
-		ds.Break2Start.Format(ChronusTimeFormat),
-		ds.Break2End.Format(ChronusTimeFormat),
-		ds.Break3Start.Format(ChronusTimeFormat),
-		ds.Break3End.Format(ChronusTimeFormat),
-	}
-}
-
+// fmtDuration formats time.Duration object into string formatted for Chronus input (7h30->0730)
 func fmtDuration(d time.Duration) string {
 	d = d.Round(time.Minute)
 	h := d / time.Hour
@@ -108,11 +94,18 @@ func fmtDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d%02d", h, m)
 }
 
+// GetChronusBreaks adjusts break times from a DaySchedule instead to make them fit into Chronus' 中断 slots.
+// Chronus contains a non-editable non-visible lunch break from 12:00 to 13:00, so one of the input breaks need to move
+// to fill that slot.
+// In order, the steps taken are:
+// 1) remove empty breaks,
+// 2) get break closest to lunch time and move its started at 12:00
+// 3) leave other breaks as is
 func (ds *DaySchedule) GetChronusBreaks() ([][]time.Time, error) {
 
 	var err error
 
-	lunchTime, _ := time.Parse("1504", "1230")
+	lunchTime, _ := time.Parse(ChronusTimeFormat, "1230")
 	chronusBreaks := [][]time.Time{
 		{ds.Break1Start, ds.Break1End},
 		{ds.Break2Start, ds.Break2End},
@@ -147,24 +140,24 @@ func (ds *DaySchedule) GetChronusBreaks() ([][]time.Time, error) {
 	} else if closestBreakDuration.Minutes() < 60 {
 		err = fmt.Errorf("lunch break less than 60min. Giving up")
 	} else {
-		chronusBreaks[lunchClosestIdx][0], _ = time.Parse("1504", "1200")
+		chronusBreaks[lunchClosestIdx][0], _ = time.Parse(ChronusTimeFormat, "1200")
 		chronusBreaks[lunchClosestIdx][1] = chronusBreaks[lunchClosestIdx][0].Add(closestBreakDuration)
 	}
 
 	return chronusBreaks, err
 }
 
+// RegisterWorkOneDay fills in information for a specific day in Chronus and submits the form.
 func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
 
 	ws := workDay.WorkSchedule
-	chronusSchedule := ws.ToChronus()
 
 	// Fill-in top of the page
-	err := ch.Page.Find(ChronusWorkStartTimeSelector).Fill(chronusSchedule.WorkStart)
+	err := ch.Page.Find(ChronusWorkStartTimeSelector).Fill(ws.WorkStart.Format(ChronusTimeFormat))
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	err = ch.Page.Find(ChronusWorkEndTimeSelector).Fill(chronusSchedule.WorkEnd)
+	err = ch.Page.Find(ChronusWorkEndTimeSelector).Fill(ws.WorkEnd.Format(ChronusTimeFormat))
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -192,8 +185,8 @@ func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
 		breaksInfo, err := ws.GetChronusBreaks()
 		for breakIdx, breakInfo := range breaksInfo {
 
-			breakStartTimeStr := breakInfo[0].Format("1504")
-			breakEndTimeStr := breakInfo[1].Format("1504")
+			breakStartTimeStr := breakInfo[0].Format(ChronusTimeFormat)
+			breakEndTimeStr := breakInfo[1].Format(ChronusTimeFormat)
 
 			err = breakStartInputs.At(breakIdx).Fill(breakStartTimeStr)
 			if err != nil {
@@ -228,6 +221,16 @@ func (ch *chronus) RegisterWorkOneDay(workDay workday) error {
 	return nil
 }
 
+// isChronusLoginFinished checks browser page to see if the page following log-in is done loading
+func isChronusLoginFinished(Page *agouti.Page) bool {
+	_ = Page.ConfirmPopup()
+	count, _ := Page.FindByName(ChronusCalendarFrameName).Count()
+	return count > 0
+}
+
+// isDayRegistered checks browser page to see if the chronus day we just registered is done being registered.
+// An error to register is also considered as "done". The goal here is to make sure that whatever we input is done
+// processing
 func isDayRegistered(Page *agouti.Page) bool {
 	var topBarText string
 	_ = Page.RunScript(ChronusRegisteredTopBarScript, nil, &topBarText)
@@ -237,11 +240,11 @@ func isDayRegistered(Page *agouti.Page) bool {
 	return hasErrorCount > 0 || hasSuccess
 }
 
+// RegisterWork registers unregistered days in the chronus calendar using the input workMonth
 func (ch *chronus) RegisterWork(workMonth []workday) error {
 
 	_ = sleepUntil(isChronusLoginFinished, ch.Page, SalesforceMaxSleepTime)
 	time.Sleep(100 * time.Millisecond)
-	fmt.Println("Login finished")
 
 	// First switch frame to focus on the calendar one (without that, we cannot select the items inside)
 	calendarFrame := ch.Page.FindByName(ChronusCalendarFrameName)
