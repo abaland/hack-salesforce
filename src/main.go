@@ -40,12 +40,12 @@ func main() {
 		return
 	}
 	//defer driver.Stop()
-	sf, err := driver.NewSalesForce(salesforceConfig.User, salesforceConfig.Password)
+	sf, err := driver.NewSalesForce()
 	if err != nil {
 		logger.Errorf("Failed to create instance:%v", err)
 		return
 	}
-	err = sf.Login()
+	err = sf.Login(*salesforceConfig)
 	if err != nil {
 		logger.Errorf("Failed to login:%v", err)
 		return
@@ -62,12 +62,12 @@ func main() {
 	file, _ := json.MarshalIndent(workmonth, "", " ")
 	_ = ioutil.WriteFile("test.json", file, 0644)
 
-	ch, err := driver.NewChronus(chronusConfig.User, chronusConfig.Password)
+	ch, err := driver.NewChronus()
 	if err != nil {
 		logger.Errorf("Failed to create chronus instance:%v", err)
 		return
 	}
-	err = ch.Login()
+	err = ch.Login(*chronusConfig)
 	if err != nil {
 		logger.Errorf("Failed to login:%v", err)
 		return

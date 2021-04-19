@@ -2,28 +2,34 @@ package main
 
 import "gopkg.in/go-ini/ini.v1"
 
-type Config struct {
+// Credentials holds username and password information for a specific website
+type Credentials struct {
 	User     string
 	Password string
 }
 
 const (
+	// Information about how to parse config file for salesforce credentials
 	salesforceSection     = "salesforce"
 	salesforceUserKey     = "user"
 	salesforcePasswordKey = "password"
-	chronusSection        = "chronus"
-	chronusUserKey        = "user"
-	chronusPasswordKey    = "password"
+
+	// Information about how to parse config file for chronus credentials
+	chronusSection     = "chronus"
+	chronusUserKey     = "user"
+	chronusPasswordKey = "password"
 )
 
-func ParseCredentials(c *ini.File, section string, userKey string, passwordKey string) *Config {
-	return &Config{
+// ParseCredentials extracts username and password information from a given config object
+func ParseCredentials(c *ini.File, section string, userKey string, passwordKey string) *Credentials {
+	return &Credentials{
 		User:     c.Section(section).Key(userKey).String(),
 		Password: c.Section(section).Key(passwordKey).String(),
 	}
 }
 
-func NewConfig(configPath string) (*Config, *Config, error) {
+// NewConfig reads .ini config files and generates salesforce and chronus credentials objects
+func NewConfig(configPath string) (*Credentials, *Credentials, error) {
 	c, err := ini.Load(configPath)
 	if err != nil {
 		return nil, nil, err

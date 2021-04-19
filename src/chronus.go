@@ -51,11 +51,10 @@ const (
 )
 
 type chronus struct {
-	Account account
-	Page    *agouti.Page
+	Page *agouti.Page
 }
 
-func (d *Driver) NewChronus(username, password string) (*chronus, error) {
+func (d *Driver) NewChronus() (*chronus, error) {
 	page, err := d.NewPage()
 	if err != nil {
 		return nil, err
@@ -64,19 +63,15 @@ func (d *Driver) NewChronus(username, password string) (*chronus, error) {
 		return nil, err
 	}
 	return &chronus{
-		Account: account{
-			UserName: username,
-			Password: password,
-		},
 		Page: page,
 	}, nil
 }
 
-func (ch *chronus) Login() error {
+func (ch *chronus) Login(credentials Credentials) error {
 	// ID, Passの要素を取得し、値を設定
 	noScriptArgs := map[string]interface{}{}
-	_ = ch.Page.RunScript(ChronusUserNameSelector+"= \""+ch.Account.UserName+"\"", noScriptArgs, nil)
-	_ = ch.Page.RunScript(ChronusPasswordSelector+"= \""+ch.Account.Password+"\"", noScriptArgs, nil)
+	_ = ch.Page.RunScript(ChronusUserNameSelector+"= \""+credentials.User+"\"", noScriptArgs, nil)
+	_ = ch.Page.RunScript(ChronusPasswordSelector+"= \""+credentials.Password+"\"", noScriptArgs, nil)
 	// formをサブミット
 	if err := ch.Page.Find(ChronusLoginSubmitSelector).Click(); err != nil {
 		return err
@@ -113,15 +108,15 @@ func fmtDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d%02d", h, m)
 }
 
-func (ws *DaySchedule) GetChronusBreaks() ([][]time.Time, error) {
+func (ds *DaySchedule) GetChronusBreaks() ([][]time.Time, error) {
 
 	var err error
 
 	lunchTime, _ := time.Parse("1504", "1230")
 	chronusBreaks := [][]time.Time{
-		{ws.Break1Start, ws.Break1End},
-		{ws.Break2Start, ws.Break2End},
-		{ws.Break3Start, ws.Break3End},
+		{ds.Break1Start, ds.Break1End},
+		{ds.Break2Start, ds.Break2End},
+		{ds.Break3Start, ds.Break3End},
 	}
 
 	// Remove all empty breaks

@@ -8,6 +8,7 @@ require (
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/goconvey v1.6.4 // indirect
+	golang.org/x/tools v0.1.0 // indirect
 	gopkg.in/go-ini/ini.v1 v1.51.0
 	gopkg.in/ini.v1 v1.62.0 // indirect
 )
