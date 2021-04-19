@@ -240,6 +240,42 @@ func isDayRegistered(Page *agouti.Page) bool {
 	return hasErrorCount > 0 || hasSuccess
 }
 
+// ReclickOnDay switches back to the calendar frame and redoes a click on the day selected.
+// This function was added due to inconsistent behavior between runs where the day page did not show up after clicking
+// for unknown reason
+func (ch *chronus) ReclickOnDay(calendarFrame *agouti.Selection, dayFrame *agouti.Selection, editableDay *agouti.Selection) error {
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Switches back to calendar frame
+	err := ch.Page.SwitchToRootFrame()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = calendarFrame.SwitchToFrame()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	// Reclick on day
+	err = editableDay.Click()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	// Switches back to day frame
+	err = ch.Page.SwitchToRootFrame()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	err = dayFrame.SwitchToFrame()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	return nil
+}
+
 // RegisterWork registers unregistered days in the chronus calendar using the input workMonth
 func (ch *chronus) RegisterWork(workMonth []workday) error {
 
@@ -257,7 +293,8 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 
 	// We fill chronus backwards due to At() refreshing everytime the selection, thus skipping every other item
 	for i := ChronusMaxDays; i >= 0; i-- {
-		dayAsText, err := editableDays.At(i).Text()
+		editableDay := editableDays.At(i)
+		dayAsText, err := editableDay.Text()
 		if err != nil {
 			// Error here are due to out-of-range days (just skip those)
 			continue
@@ -267,8 +304,9 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 		for _, workDay := range workMonth {
 			if workDay.DayIdx == dayAsInt && workDay.WorkSchedule.WorkEnd.Hour() > 0 {
 
+				// Clicks on day in calendar frame, then move to the day page
 				fmt.Println(workDay.Day)
-				err = editableDays.At(i).Click()
+				err = editableDay.Click()
 				if err != nil {
 					fmt.Println(err.Error())
 				}
@@ -282,6 +320,17 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 					fmt.Println(err.Error())
 				}
 
+				// Handles potential timing error
+				count, _ := ch.Page.Find(ChronusWorkStartTimeSelector).Count()
+				if count == 0 {
+					fmt.Println("Reclicking!")
+					err := ch.ReclickOnDay(calendarFrame, dayFrame, editableDay)
+					if err != nil {
+						return err
+					}
+				}
+
+				// If workschedule has this day as non-empty, fill it
 				if workDay.WorkSchedule.WorkStart.Hour() != 0 {
 					err = ch.RegisterWorkOneDay(workDay)
 					if err != nil {
@@ -291,6 +340,7 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 
 				_ = sleepUntil(isDayRegistered, ch.Page, SalesforceMaxSleepTime)
 
+				// Moves back to calendar frame
 				err = ch.Page.SwitchToRootFrame()
 				if err != nil {
 					fmt.Println(err.Error())
@@ -300,6 +350,7 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 					fmt.Println(err.Error())
 				}
 
+				// Refresh calendar frame
 				err = ch.Page.Find(ChronusCalendarRefreshSelector).Click()
 				if err != nil {
 					fmt.Println(err.Error())
