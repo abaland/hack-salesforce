@@ -21,12 +21,13 @@ const (
 
 	ChronusCalendarFrameName    = "MENU"
 	ChronusDayScheduleFrameName = "OPERATION"
-	ChronusClickableDays        = `td.calCellNotRegistration a.calLinkWeekDay`
+	ChronusClickableDays        = `td.calCellNotRegistration a.calLinkWeekDay, td.calCellDisapproval a.calLinkWeekDay`
 	ChronusMaxDays              = 31 // After removing weekend, 22 is max?
 
 	ChronusWorkStartTimeSelector = `input[type="text"][name="StartTime"]`
 	ChronusWorkEndTimeSelector   = `input[type="text"][name="EndTime"]`
 
+	//ChronusWorkBreakStartSelector defines selector to get 中断 start and end fields
 	// All 3 breaks have the same selector!
 	ChronusWorkBreakStartSelector = `td input.InputTxtR[name="PrivateStart"]`
 	ChronusWorkBreakEndSelector   = `td input.InputTxtR[name="PrivateEnd"]`
