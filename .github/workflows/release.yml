@@ -13,9 +13,9 @@ jobs:
           - platform: ubuntu-latest
             executable: chronus_sync.${{ github.event.release.tag_name }}
             target: Linux
-          - platform: windows-latest
-            executable: chronus_sync.${{ github.event.release.tag_name }}.exe
-            target: Windows
+#          - platform: windows-latest
+#            executable: chronus_sync.${{ github.event.release.tag_name }}.exe
+#            target: Windows
 
     runs-on: ${{ matrix.platform }}
 
@@ -42,5 +42,5 @@ jobs:
           aws_key_id: ${{ secrets.AWS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
           aws_bucket: ${{ secrets.AWS_BUCKET }}
-          source_dir: ${{ matrix.executable }}'
+          source_dir: ${{ matrix.executable }}
           destination_dir: 'build'
