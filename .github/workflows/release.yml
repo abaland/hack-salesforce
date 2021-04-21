@@ -34,7 +34,9 @@ jobs:
         run: go get -t ./src
 
       - name: Build tool
-        run: go build -o ${{ matrix.executable }} -v ./src
+        # Remark (issue described in https://github.com/shallwefootball/upload-s3-action/issues/6 )
+        # The action doesn't work with a single file (though it should) so make a folder with 1 file in it
+        run: go build -o ${{ matrix.executable }}/${{ matrix.executable }} -v ./src
 
       - name: Publish to S3 bucket
         uses: shallwefootball/s3-upload-action@master
