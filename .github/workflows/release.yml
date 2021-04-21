@@ -38,7 +38,7 @@ jobs:
         run: go build -o build_dir/${{ matrix.executable }} -v ./src
 
       - name: Publish to S3 bucket
-        uses: actions/upload-s3-action@master
+        uses: abaland/upload-s3-action@master
         with:
           aws_key_id: ${{ secrets.AWS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
