@@ -7,15 +7,14 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ubuntu-latest]
-        # platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-latest, windows-latest]
         include:
           - platform: ubuntu-latest
             executable: chronus_sync.${{ github.event.release.tag_name }}
             target: Linux
-#          - platform: windows-latest
-#            executable: chronus_sync.${{ github.event.release.tag_name }}.exe
-#            target: Windows
+          - platform: windows-latest
+            executable: chronus_sync.${{ github.event.release.tag_name }}.exe
+            target: Windows
 
     runs-on: ${{ matrix.platform }}
 
@@ -36,7 +35,7 @@ jobs:
       - name: Build tool
         # Remark (issue described in https://github.com/shallwefootball/upload-s3-action/issues/6 )
         # The action doesn't work with a single file (though it should) so make a folder with 1 file in it
-        run: go build -o ${{ matrix.executable }}/${{ matrix.executable }} -v ./src
+        run: go build -o build_dir/${{ matrix.executable }} -v ./src
 
       - name: Publish to S3 bucket
         uses: shallwefootball/s3-upload-action@master
@@ -44,5 +43,5 @@ jobs:
           aws_key_id: ${{ secrets.AWS_KEY_ID }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
           aws_bucket: ${{ secrets.AWS_BUCKET }}
-          source_dir: ${{ matrix.executable }}
+          source_dir: build_dir
           destination_dir: 'build'
