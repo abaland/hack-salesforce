@@ -1,7 +1,7 @@
 name: Release
 on:
   release:
-    types: [released]
+    types: [created]
 
 jobs:
   test:
@@ -10,10 +10,10 @@ jobs:
         platform: [ubuntu-latest, windows-latest]
         include:
           - platform: ubuntu-latest
-            executable: chronus_sync.${{ github.event.release.tag_name }}
+            executable: chronus_sync
             target: Linux
           - platform: windows-latest
-            executable: chronus_sync.${{ github.event.release.tag_name }}.exe
+            executable: chronus_sync.exe
             target: Windows
 
     runs-on: ${{ matrix.platform }}
@@ -37,11 +37,9 @@ jobs:
         # The action doesn't work with a single file (though it should) so make a folder with 1 file in it
         run: go build -o build_dir/${{ matrix.executable }} -v ./src
 
-      - name: Publish to S3 bucket
-        uses: abaland/upload-s3-action@master
+      - name: Edit the release to attach built files
+        uses: skx/github-action-publish-binaries@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          aws_key_id: ${{ secrets.AWS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
-          aws_bucket: ${{ secrets.AWS_BUCKET }}
-          source_dir: build_dir
-          destination_dir: 'build'
+          args: ${{ matrix.executable }}
