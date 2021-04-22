@@ -1,18 +1,19 @@
 name: Release
+
 on:
   release:
     types: [created]
 
 jobs:
-  test:
+  build:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-18.04, windows-2019]
         include:
-          - platform: ubuntu-latest
+          - platform: ubuntu-18.04
             executable: chronus_sync
             target: Linux
-          - platform: windows-latest
+          - platform: windows-2019
             executable: chronus_sync.exe
             target: Windows
 
@@ -33,13 +34,44 @@ jobs:
         run: go get -t ./src
 
       - name: Build tool
-        # Remark (issue described in https://github.com/shallwefootball/upload-s3-action/issues/6 )
-        # The action doesn't work with a single file (though it should) so make a folder with 1 file in it
         run: go build -o ${{ matrix.executable }} -v ./src
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Upload file to S3
+        env:
+          BUCKET: ${{ secrets.AWS_BUCKET }}
+          FILE: ${{ matrix.executable }}
+        run: |
+          aws s3 cp ./$FILE s3://$BUCKET/$FILE --quiet
+
+  push:
+    needs: build
+    runs-on: ubuntu-18.04
+    if: sualways()
+    steps:
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Download files from S3
+        env:
+          BUCKET: ${{ secrets.AWS_BUCKET }}
+        run: |
+          aws s3 sync --include="chronus_*" s3://$BUCKET ./ --quiet
 
       - name: Edit the release to attach built files
         uses: skx/github-action-publish-binaries@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.executable }}
+          args: 'chronus_*'
