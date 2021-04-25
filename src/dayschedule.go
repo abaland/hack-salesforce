@@ -42,7 +42,7 @@ func (ds *DaySchedule) GetTotBreakTime() time.Duration {
 
 	break1Time := ds.Break1End.Sub(ds.Break1Start)
 	break2Time := ds.Break2End.Sub(ds.Break2Start)
-	break3Time := ds.Break2End.Sub(ds.Break3Start)
+	break3Time := ds.Break3End.Sub(ds.Break3Start)
 
 	return break1Time + break2Time + break3Time
 }
