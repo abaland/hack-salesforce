@@ -43,6 +43,10 @@ const (
 	ChronusWorkTypeCompanyName = `出社`
 	ChronusWorkTypeRemoteName  = `フルテレワーク`
 
+	// ChronusDayOffSelectSelector defines selector for dropdown menu to choose the type of day Off
+	ChronusDayOffSelectSelector = `select[name="HolidayDivision"]`
+	DayOffTypeRegular           = `年休`
+
 	ChronusRegisterScript          = `top.dosubmitRegister()`
 	ChronusCalendarRefreshSelector = `img[src="../gif/saihyoji.gif"]`
 
@@ -146,6 +150,26 @@ func (ds *DaySchedule) GetChronusBreaks() ([][]time.Time, error) {
 	}
 
 	return chronusBreaks, err
+}
+
+// RegisterDayOffOneDay fills in Day Off information for a specific day in Chronus and submits the form.
+func (ch *chronus) RegisterDayOffOneDay(workDay workday) error {
+
+	// Fill-in top of the page
+	err := ch.Page.Find(ChronusDayOffSelectSelector).Select(DayOffTypeRegular)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	// Fill in 備考 section
+	err = ch.Page.Find(ChronusCommentSelector).Fill(workDay.WorkComment)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	// Submit
+	err = ch.Page.RunScript(ChronusRegisterScript, nil, nil)
+
+	return nil
 }
 
 // RegisterWorkOneDay fills in information for a specific day in Chronus and submits the form.
@@ -303,7 +327,8 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 		dayAsInt, err := strconv.Atoi(dayAsText)
 
 		for _, workDay := range workMonth {
-			if workDay.DayIdx == dayAsInt && workDay.WorkSchedule.WorkEnd.Hour() > 0 {
+			encodableWorkDay := workDay.WorkSchedule.WorkEnd.Hour() > 0 || workDay.DayOff
+			if workDay.DayIdx == dayAsInt && encodableWorkDay {
 
 				// Clicks on day in calendar frame, then move to the day page
 				fmt.Println(workDay.Day)
@@ -332,11 +357,13 @@ func (ch *chronus) RegisterWork(workMonth []workday) error {
 				}
 
 				// If workschedule has this day as non-empty, fill it
-				if workDay.WorkSchedule.WorkStart.Hour() != 0 {
+				if workDay.DayOff {
+					err = ch.RegisterDayOffOneDay(workDay)
+				} else if workDay.WorkSchedule.WorkStart.Hour() != 0 {
 					err = ch.RegisterWorkOneDay(workDay)
-					if err != nil {
-						fmt.Println(err.Error())
-					}
+				}
+				if err != nil {
+					fmt.Println(err.Error())
 				}
 
 				_ = sleepUntil(isDayRegistered, ch.Page, SalesforceMaxSleepTime)
