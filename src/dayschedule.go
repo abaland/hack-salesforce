@@ -2,21 +2,6 @@ package main
 
 import "time"
 
-// DayScheduleStr contains the workday information (start/end of whole day and breaks) as string
-type DayScheduleStr struct {
-	WorkStart string
-	WorkEnd   string
-
-	Break1Start string
-	Break1End   string
-
-	Break2Start string
-	Break2End   string
-
-	Break3Start string
-	Break3End   string
-}
-
 // DaySchedule contains the workday information (start/end of whole day and breaks) as timestamp object
 type DaySchedule struct {
 	WorkStart time.Time
