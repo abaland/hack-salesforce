@@ -1,6 +1,6 @@
 # salesforce-chronus sync
 
-![testing](https://github.com/abaland/hack-salesforce/actions/workflows/release.yml/testing.svg)
+![testing](https://github.com/abaland/hack-salesforce/actions/workflows/testing.yml/badge.svg)
 
 ## Description
 Parses timesheet from salesforce's TeamSpirit application and records the parsed data into the TIS chronus website.
